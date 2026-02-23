@@ -3,7 +3,15 @@ import QuizDisplay from './QuizDisplay';
 import AnalysisCard from './AnalysisCard';
 import './ChatMessage.css';
 
-export default function ChatMessage({ type, message, data, isUser }) {
+function getCopyText(message, data) {
+  let text = message || '';
+  if (data != null && typeof data === 'object') {
+    text += '\n\n' + (Array.isArray(data) ? JSON.stringify(data, null, 2) : JSON.stringify(data, null, 2));
+  }
+  return text;
+}
+
+export default function ChatMessage({ type, message, data, isUser, onCopy }) {
   if (isUser) {
     return (
       <div className="chat-msg chat-msg--user">
@@ -12,9 +20,23 @@ export default function ChatMessage({ type, message, data, isUser }) {
     );
   }
 
+  const copyText = getCopyText(message, data);
+
   return (
     <div className="chat-msg chat-msg--bot">
-      <p className="chat-msg-text">{message}</p>
+      <div className="chat-msg-header">
+        <p className="chat-msg-text">{message}</p>
+        {onCopy && copyText && (
+          <button
+            type="button"
+            className="chat-msg-copy"
+            onClick={() => onCopy(copyText)}
+            aria-label="Copy response"
+          >
+            Copy
+          </button>
+        )}
+      </div>
 
       {type === 'intervention' && data && (() => {
         const list = Array.isArray(data) ? data : (data.students || []);

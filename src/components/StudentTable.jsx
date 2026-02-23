@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDebounce } from '../hooks/useDebounce';
 import RiskBadge from './RiskBadge';
 import './StudentTable.css';
 
@@ -25,18 +26,19 @@ function PassProbabilityBar({ value }) {
 export default function StudentTable({ students = [], loading }) {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 280);
   const [sortKey, setSortKey] = useState('student_id');
   const [sortDir, setSortDir] = useState('asc');
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return students;
-    const s = search.toLowerCase();
+    if (!debouncedSearch.trim()) return students;
+    const s = debouncedSearch.toLowerCase();
     return students.filter(
       (st) =>
         String(st.student_id || '').toLowerCase().includes(s) ||
         (st.weak_topics || []).some((t) => String(t).toLowerCase().includes(s))
     );
-  }, [students, search]);
+  }, [students, debouncedSearch]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -65,13 +67,35 @@ export default function StudentTable({ students = [], loading }) {
     }
   };
 
+  const isEmpty = !loading && students.length === 0;
+  const noResults = !loading && students.length > 0 && sorted.length === 0;
+
   if (loading) {
     return (
       <div className="student-table-card">
+        <div className="student-table-toolbar">
+          <input
+            type="search"
+            placeholder="Search by ID or topic..."
+            disabled
+            className="student-table-search"
+          />
+        </div>
         <div className="student-table-skeleton">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="skeleton" style={{ height: 48, marginBottom: 8 }} />
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isEmpty) {
+    return (
+      <div className="student-table-card">
+        <div className="student-table-empty">
+          <p className="student-table-empty-title">No students loaded</p>
+          <p className="student-table-empty-desc">Use Refresh to load data from the server.</p>
         </div>
       </div>
     );
@@ -97,61 +121,69 @@ export default function StudentTable({ students = [], loading }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="student-table-search"
+          aria-label="Search students"
         />
       </div>
-      <div className="student-table-scroll">
-        <table className="student-table">
-          <thead>
-            <tr>
-              {headers.map((h) => (
-                <th key={h.key}>
-                  <button
-                    type="button"
-                    className="th-sort"
-                    onClick={() => toggleSort(h.key)}
-                  >
-                    {h.label}
-                    <span className="sort-icon">
-                      {sortKey === h.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
-                    </span>
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((student) => (
-              <tr
-                key={student.student_id}
-                onClick={() => navigate(`/student/${student.student_id}`)}
-                className="student-row"
-              >
-                <td>{student.student_id}</td>
-                <td>{student.attendance ?? '-'}</td>
-                <td>{student.internal_marks ?? '-'}</td>
-                <td>{student.assignment_marks ?? '-'}</td>
-                <td>{student.previous_gpa ?? '-'}</td>
-                <td>
-                  <PassProbabilityBar value={student.pass_probability} />
-                </td>
-                <td>
-                  <RiskBadge level={student.risk_level} />
-                </td>
-                <td>
-                  <div className="weak-topics">
-                    {(student.weak_topics || []).map((t) => (
-                      <span key={t} className="weak-topic-chip">{t}</span>
-                    ))}
-                    {(student.weak_topics || []).length === 0 && (
-                      <span className="weak-topic-none">—</span>
-                    )}
-                  </div>
-                </td>
+      {noResults ? (
+        <div className="student-table-empty student-table-empty--filtered">
+          <p className="student-table-empty-title">No matching students</p>
+          <p className="student-table-empty-desc">Try a different search or clear filters.</p>
+        </div>
+      ) : (
+        <div className="student-table-scroll">
+          <table className="student-table">
+            <thead>
+              <tr>
+                {headers.map((h) => (
+                  <th key={h.key}>
+                    <button
+                      type="button"
+                      className="th-sort"
+                      onClick={() => toggleSort(h.key)}
+                    >
+                      {h.label}
+                      <span className="sort-icon">
+                        {sortKey === h.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                      </span>
+                    </button>
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {sorted.map((student) => (
+                <tr
+                  key={student.student_id}
+                  onClick={() => navigate(`/student/${student.student_id}`)}
+                  className="student-row"
+                >
+                  <td>{student.student_id}</td>
+                  <td>{student.attendance ?? '-'}</td>
+                  <td>{student.internal_marks ?? '-'}</td>
+                  <td>{student.assignment_marks ?? '-'}</td>
+                  <td>{student.previous_gpa ?? '-'}</td>
+                  <td>
+                    <PassProbabilityBar value={student.pass_probability} />
+                  </td>
+                  <td>
+                    <RiskBadge level={student.risk_level} />
+                  </td>
+                  <td>
+                    <div className="weak-topics">
+                      {(student.weak_topics || []).map((t) => (
+                        <span key={t} className="weak-topic-chip">{t}</span>
+                      ))}
+                      {(student.weak_topics || []).length === 0 && (
+                        <span className="weak-topic-none">—</span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

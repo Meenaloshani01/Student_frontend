@@ -151,3 +151,25 @@
 .student-table-skeleton {
   padding: 16px;
 }
+
+.student-table-empty {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.student-table-empty-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+.student-table-empty-desc {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.student-table-empty--filtered {
+  padding: 32px 24px;
+}

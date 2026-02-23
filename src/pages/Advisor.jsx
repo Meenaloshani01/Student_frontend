@@ -1,7 +1,30 @@
 import { useState, useRef, useEffect } from 'react';
 import { askAdvisor } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
 import ChatMessage from '../components/ChatMessage';
 import './Advisor.css';
+
+const RECENT_KEY = 'advisor_recent_queries';
+const MAX_RECENT = 8;
+
+function getRecentQueries() {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentQuery(query) {
+  const q = query.trim();
+  if (!q) return;
+  let recent = getRecentQueries().filter((r) => r !== q);
+  recent = [q, ...recent].slice(0, MAX_RECENT);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+  } catch (_) {}
+}
 
 const QUICK_ACTIONS = [
   { label: 'Students needing intervention', query: 'Which students need intervention?' },
@@ -10,12 +33,19 @@ const QUICK_ACTIONS = [
 ];
 
 export default function Advisor() {
+  const { addToast } = useToast();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [recentQueries, setRecentQueries] = useState(getRecentQueries);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    document.title = 'AI Advisor – Student Advisor AI';
+    return () => { document.title = 'Student Advisor AI'; };
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -33,6 +63,8 @@ export default function Advisor() {
     setMessages((prev) => [...prev, { isUser: true, message: q }]);
     setLoading(true);
     setError(null);
+    saveRecentQuery(q);
+    setRecentQueries(getRecentQueries());
 
     try {
       const res = await askAdvisor(q);
@@ -47,6 +79,7 @@ export default function Advisor() {
       ]);
     } catch (err) {
       setError(err.message || 'Request failed');
+      addToast(err.message || 'Request failed', 'error');
       setMessages((prev) => [
         ...prev,
         {
@@ -66,11 +99,38 @@ export default function Advisor() {
     sendMessage(query);
   };
 
+  const handleClearChat = () => {
+    setMessages([]);
+    setError(null);
+    addToast('Conversation cleared', 'success');
+  };
+
+  const handleCopy = (text) => {
+    navigator.clipboard.writeText(text).then(
+      () => addToast('Copied to clipboard', 'success'),
+      () => addToast('Copy failed', 'error')
+    );
+  };
+
   return (
     <div className="advisor">
       <header className="advisor-header">
-        <h1 className="advisor-title">AI Advisor</h1>
-        <p className="advisor-subtitle">Ask about interventions, student risk, or generate quizzes</p>
+        <div className="advisor-header-row">
+          <div>
+            <h1 className="advisor-title">AI Advisor</h1>
+            <p className="advisor-subtitle">Ask about interventions, student risk, or generate quizzes</p>
+          </div>
+          {messages.length > 0 && (
+            <button
+              type="button"
+              className="advisor-clear"
+              onClick={handleClearChat}
+              aria-label="Clear conversation"
+            >
+              Clear chat
+            </button>
+          )}
+        </div>
       </header>
 
       {error && (
@@ -98,6 +158,24 @@ export default function Advisor() {
                   </button>
                 ))}
               </div>
+              {recentQueries.length > 0 && (
+                <div className="advisor-recent">
+                  <p className="advisor-recent-label">Recent</p>
+                  <div className="advisor-recent-chips">
+                    {recentQueries.map((query) => (
+                      <button
+                        key={query}
+                        type="button"
+                        className="advisor-recent-chip"
+                        onClick={() => handleQuickAction(query)}
+                        disabled={loading}
+                      >
+                        {query}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {messages.map((msg, i) => (
@@ -107,6 +185,7 @@ export default function Advisor() {
               type={msg.type}
               message={msg.message}
               data={msg.data}
+              onCopy={handleCopy}
             />
           ))}
           {loading && (

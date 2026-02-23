@@ -11,6 +11,14 @@
   flex-shrink: 0;
 }
 
+.advisor-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .advisor-title {
   font-size: 1.75rem;
   font-weight: 700;
@@ -23,6 +31,21 @@
   font-size: 0.95rem;
   color: var(--text-secondary);
   margin: 0;
+}
+
+.advisor-clear {
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.advisor-clear:hover {
+  border-color: var(--risk-high);
+  color: var(--risk-high);
 }
 
 .advisor-error {
@@ -74,6 +97,45 @@
 .advisor-welcome p {
   margin: 0 0 20px 0;
   font-size: 0.95rem;
+}
+
+.advisor-recent {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.advisor-recent-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0 0 10px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.advisor-recent-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.advisor-recent-chip {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.advisor-recent-chip:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
 }
 
 .advisor-quick-actions {

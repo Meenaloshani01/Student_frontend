@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { getStudentById, askAdvisor } from '../services/api';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { getStudentById, askAdvisor, uploadCSV } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
 import RiskBadge from '../components/RiskBadge';
 import RadarChart from '../components/RadarChart';
 import AnalysisCard from '../components/AnalysisCard';
@@ -10,6 +11,7 @@ import './StudentDetail.css';
 export default function StudentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -17,6 +19,8 @@ export default function StudentDetail() {
   const [quiz, setQuiz] = useState(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [loadingQuiz, setLoadingQuiz] = useState(false);
+  const [uploadingCSV, setUploadingCSV] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +41,13 @@ export default function StudentDetail() {
       });
     return () => { cancelled = true; };
   }, [id]);
+
+  useEffect(() => {
+    if (student?.student_id) {
+      document.title = `Student ${student.student_id} – Student Advisor AI`;
+    }
+    return () => { document.title = 'Student Advisor AI'; };
+  }, [student?.student_id]);
 
   const handleAnalyzeRisk = () => {
     if (!id || !student) return;
@@ -68,6 +79,49 @@ export default function StudentDetail() {
       .finally(() => setLoadingQuiz(false));
   };
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      performUpload(file);
+    }
+  };
+
+  const performUpload = async (file) => {
+    setUploadingCSV(true);
+    try {
+      const response = await uploadCSV(file);
+      addToast(response.message || 'CSV uploaded successfully', 'success');
+      // Clear file input value after successful upload
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      let errorMessage = 'Failed to upload CSV';
+      
+      if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Upload timed out. Please try again.';
+      } else if (error.response) {
+        errorMessage = error.response.data?.detail 
+          || error.response.data?.message 
+          || `Server error: ${error.response.status}`;
+      } else if (error.request) {
+        errorMessage = 'Network error. Please check your connection.';
+      }
+      
+      addToast(errorMessage, 'error');
+      // Clear file input value after error
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } finally {
+      setUploadingCSV(false);
+    }
+  };
+
   const passPct = student
     ? Math.round(Number(student.pass_probability) * 100) || 0
     : 0;
@@ -91,7 +145,7 @@ export default function StudentDetail() {
       <div className="student-detail">
         <div className="student-detail-error">
           <p>{error || 'Student not found'}</p>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/')}>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/dashboard')}>
             Back to Dashboard
           </button>
         </div>
@@ -101,7 +155,12 @@ export default function StudentDetail() {
 
   return (
     <div className="student-detail">
-      <button type="button" className="student-detail-back" onClick={() => navigate('/')}>
+      <nav className="student-breadcrumb" aria-label="Breadcrumb">
+        <Link to="/dashboard" className="student-breadcrumb-link">Dashboard</Link>
+        <span className="student-breadcrumb-sep">→</span>
+        <span className="student-breadcrumb-current">Student {student.student_id}</span>
+      </nav>
+      <button type="button" className="student-detail-back" onClick={() => navigate('/dashboard')}>
         ← Back to Dashboard
       </button>
 
@@ -174,6 +233,22 @@ export default function StudentDetail() {
             {loadingQuiz ? 'Generating…' : 'Generate Quiz'}
           </button>
         )}
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={handleUploadClick}
+          disabled={uploadingCSV}
+          aria-label="Upload CSV file for student data analysis"
+        >
+          {uploadingCSV ? 'Uploading…' : 'Upload CSV'}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv"
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
       </div>
 
       {analysis && (
