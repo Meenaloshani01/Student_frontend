@@ -1,0 +1,182 @@
+.student-detail {
+  padding-bottom: 40px;
+}
+
+.student-detail-back {
+  background: none;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+  padding: 0;
+  transition: color var(--transition-fast);
+}
+
+.student-detail-back:hover {
+  color: var(--accent-primary);
+}
+
+.student-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.student-detail-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.student-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 900px) {
+  .student-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.student-info-card,
+.student-radar-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-card);
+}
+
+.student-info-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 18px 0;
+}
+
+.student-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.student-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.student-info-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.student-info-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.student-info-value--pct.student-info-value--high {
+  color: var(--risk-high);
+}
+
+.student-info-value--pct.student-info-value--medium {
+  color: var(--risk-medium);
+}
+
+.student-info-value--pct.student-info-value--low {
+  color: var(--risk-low);
+}
+
+.student-weak-topics {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.student-weak-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.student-radar-card .radar-chart-wrap {
+  margin-top: 8px;
+}
+
+.student-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--accent-secondary);
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--accent-secondary-hover);
+  transform: translateY(-1px);
+}
+
+.student-analysis-section,
+.student-quiz-section {
+  margin-bottom: 32px;
+}
+
+.student-section-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 16px 0;
+}
+
+.student-detail-skeleton,
+.student-detail-error {
+  padding: 24px;
+}
+
+.student-detail-error {
+  background: var(--risk-high-bg);
+  border: 1px solid var(--risk-high);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+}
+
+.student-detail-error p {
+  margin: 0 0 16px 0;
+}

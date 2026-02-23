@@ -1,0 +1,23 @@
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  padding: 24px;
+  padding-left: 0;
+  transition: padding var(--transition-normal);
+}
+
+@media (max-width: 768px) {
+  .app-main {
+    padding: 16px;
+  }
+}
+
+.app-content {
+  max-width: 1400px;
+  margin: 0 auto;
+}
