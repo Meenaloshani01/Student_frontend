@@ -30,6 +30,37 @@ export default function StudentTable({ students = [], loading }) {
   const [sortKey, setSortKey] = useState('student_id');
   const [sortDir, setSortDir] = useState('asc');
 
+  // Dynamically detect columns from the first student record
+  const headers = useMemo(() => {
+    if (students.length === 0) return [];
+    
+    const firstStudent = students[0];
+    // Exclude these keys from display
+    const excludeKeys = ['topic_scores', 'weak_areas', 'Weak_Areas', 'WeakAreas']; 
+    const specialKeys = ['student_id', 'pass_probability', 'risk_level'];
+    
+    // Get all keys from first student
+    const allKeys = Object.keys(firstStudent).filter(key => 
+      !excludeKeys.includes(key) && firstStudent[key] !== undefined && firstStudent[key] !== null
+    );
+    
+    // Prioritize special keys first, then others, then weak_topics at end
+    const orderedKeys = [
+      ...specialKeys.filter(k => allKeys.includes(k)),
+      ...allKeys.filter(k => !specialKeys.includes(k) && k !== 'weak_topics'),
+      ...(allKeys.includes('weak_topics') ? ['weak_topics'] : [])
+    ];
+    
+    // Convert keys to readable labels
+    return orderedKeys.map(key => ({
+      key,
+      label: key
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+    }));
+  }, [students]);
+
   const filtered = useMemo(() => {
     if (!debouncedSearch.trim()) return students;
     const s = debouncedSearch.toLowerCase();
@@ -101,16 +132,57 @@ export default function StudentTable({ students = [], loading }) {
     );
   }
 
-  const headers = [
-    { key: 'student_id', label: 'ID' },
-    { key: 'attendance', label: 'Attendance' },
-    { key: 'internal_marks', label: 'Internal' },
-    { key: 'assignment_marks', label: 'Assignment' },
-    { key: 'previous_gpa', label: 'GPA' },
-    { key: 'pass_probability', label: 'Pass %' },
-    { key: 'risk_level', label: 'Risk' },
-    { key: 'weak_topics', label: 'Weak Topics' },
-  ];
+  // Render cell value based on type
+  const renderCellValue = (student, key) => {
+    const value = student[key];
+    
+    if (value === undefined || value === null) return '-';
+    
+    // Special rendering for specific fields
+    if (key === 'pass_probability') {
+      return <PassProbabilityBar value={value} />;
+    }
+    
+    if (key === 'risk_level') {
+      return <RiskBadge level={value} />;
+    }
+    
+    if (key === 'weak_topics') {
+      const topics = Array.isArray(value) ? value : [];
+      const validTopics = topics.filter(t => 
+        t && 
+        t.toLowerCase() !== 'name' && 
+        t.toLowerCase() !== 'null' && 
+        t.toLowerCase() !== 'undefined'
+      );
+      return (
+        <div className="weak-topics">
+          {validTopics.map((t, idx) => (
+            <span key={idx} className="weak-topic-chip">{t}</span>
+          ))}
+          {validTopics.length === 0 && <span className="weak-topic-none">—</span>}
+        </div>
+      );
+    }
+    
+    // Handle arrays
+    if (Array.isArray(value)) {
+      return value.join(', ') || '-';
+    }
+    
+    // Handle objects (convert to JSON string)
+    if (typeof value === 'object') {
+      return JSON.stringify(value);
+    }
+    
+    // Handle booleans
+    if (typeof value === 'boolean') {
+      return value ? 'Yes' : 'No';
+    }
+    
+    // Default: display value as-is
+    return String(value);
+  };
 
   return (
     <div className="student-table-card">
@@ -157,27 +229,11 @@ export default function StudentTable({ students = [], loading }) {
                   onClick={() => navigate(`/student/${student.student_id}`)}
                   className="student-row"
                 >
-                  <td>{student.student_id}</td>
-                  <td>{student.attendance ?? '-'}</td>
-                  <td>{student.internal_marks ?? '-'}</td>
-                  <td>{student.assignment_marks ?? '-'}</td>
-                  <td>{student.previous_gpa ?? '-'}</td>
-                  <td>
-                    <PassProbabilityBar value={student.pass_probability} />
-                  </td>
-                  <td>
-                    <RiskBadge level={student.risk_level} />
-                  </td>
-                  <td>
-                    <div className="weak-topics">
-                      {(student.weak_topics || []).map((t) => (
-                        <span key={t} className="weak-topic-chip">{t}</span>
-                      ))}
-                      {(student.weak_topics || []).length === 0 && (
-                        <span className="weak-topic-none">—</span>
-                      )}
-                    </div>
-                  </td>
+                  {headers.map((h) => (
+                    <td key={h.key}>
+                      {renderCellValue(student, h.key)}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>

@@ -7,9 +7,15 @@ export default function Sidebar() {
   const location = useLocation();
 
   const navItems = [
-    { path: '/', label: 'Home', icon: '🏠' },
-    { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/advisor', label: 'AI Advisor', icon: '💬' },
+    { path: '/', label: 'Home' },
+    { path: '/dashboard', label: 'Dashboard' },
+    { path: '/students', label: 'Students' },
+    { path: '/predictions', label: 'Predictions' },
+    { path: '/at-risk', label: 'At-Risk Students' },
+    { path: '/interventions', label: 'Interventions' },
+    { path: '/upload', label: 'Upload Data' },
+    { path: '/reports', label: 'Reports' },
+    { path: '/advisor', label: 'AI Advisor' },
   ];
 
   return (

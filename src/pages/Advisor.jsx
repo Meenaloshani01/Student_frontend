@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { askAdvisor } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 import ChatMessage from '../components/ChatMessage';
@@ -34,6 +35,7 @@ const QUICK_ACTIONS = [
 
 export default function Advisor() {
   const { addToast } = useToast();
+  const location = useLocation();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,11 +43,27 @@ export default function Advisor() {
   const [recentQueries, setRecentQueries] = useState(getRecentQueries);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const processedQueryRef = useRef(false);
 
   useEffect(() => {
     document.title = 'AI Advisor – Student Advisor AI';
     return () => { document.title = 'Student Advisor AI'; };
   }, []);
+
+  // Handle query from navigation state
+  useEffect(() => {
+    if (location.state?.query && !processedQueryRef.current) {
+      processedQueryRef.current = true;
+      const query = location.state.query;
+      // Clear the state
+      window.history.replaceState({}, document.title);
+      // Send message after a small delay to ensure state is cleared
+      setTimeout(() => {
+        sendMessage(query);
+      }, 100);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state?.query]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

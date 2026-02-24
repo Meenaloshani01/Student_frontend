@@ -202,3 +202,197 @@
 .student-detail-error p {
   margin: 0 0 16px 0;
 }
+
+/* DP Optimized Study Plan */
+.student-dp-section {
+  margin-top: 32px;
+}
+
+.student-dp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.student-dp-content {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.student-dp-controls {
+  margin-bottom: 24px;
+}
+
+.student-dp-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.student-dp-input {
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  width: 80px;
+}
+
+.student-dp-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.student-dp-metric {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+}
+
+.student-dp-metric .metric-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.student-dp-metric .metric-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+
+.student-dp-subjects {
+  margin-bottom: 24px;
+}
+
+.student-dp-subtitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.student-dp-subject {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.subject-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.subject-rank {
+  background: var(--accent-primary);
+  color: white;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.subject-name {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.subject-hours {
+  font-size: 0.9rem;
+  color: var(--accent-secondary);
+  font-weight: 600;
+}
+
+.subject-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.subject-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subject-detail span {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.progress-bar {
+  height: 8px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-fill.difficulty {
+  background: linear-gradient(90deg, #ef4444, #f59e0b);
+}
+
+.progress-fill.impact {
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+}
+
+.subject-goal {
+  padding: 10px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.student-dp-recommendations {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.student-dp-recommendations ul {
+  margin: 12px 0 0 0;
+  padding-left: 24px;
+}
+
+.student-dp-recommendations li {
+  margin-bottom: 8px;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .student-dp-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .subject-details {
+    grid-template-columns: 1fr;
+  }
+}

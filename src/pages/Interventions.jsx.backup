@@ -1,0 +1,540 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getStudents } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
+import { generateOptimizedStudyPlan, calculateStudyPlanMetrics } from '../utils/studyPlanOptimizer';
+import './Interventions.css';
+
+export default function Interventions() {
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [filterRisk, setFilterRisk] = useState('ALL');
+  const [showOptimizedPlan, setShowOptimizedPlan] = useState(null); // Student ID for showing DP plan
+  const [studyHours, setStudyHours] = useState(20); // Default available hours per week
+
+  useEffect(() => {
+    document.title = 'Interventions – Student Advisor AI';
+    
+    let cancelled = false;
+    getStudents()
+      .then((res) => {
+        if (cancelled) return;
+        const list = res.students || [];
+        setStudents(list);
+        setError(null);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          const msg = err.message || 'Failed to load data';
+          setError(msg);
+          addToast(msg, 'error');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    
+    return () => { 
+      cancelled = true;
+      document.title = 'Student Advisor AI'; 
+    };
+  }, [addToast]);
+
+  // Filter students needing intervention (High and Medium risk)
+  const studentsNeedingHelp = useMemo(() => {
+    let filtered = students.filter(s => {
+      const risk = String(s.risk_level || '').toUpperCase();
+      return risk === 'HIGH' || risk === 'MEDIUM';
+    });
+
+    if (filterRisk !== 'ALL') {
+      filtered = filtered.filter(s => String(s.risk_level || '').toUpperCase() === filterRisk);
+    }
+
+    return filtered.map(s => ({
+      id: s.student_id || s.id || s.record_id || 'N/A',
+      passProb: Number(s.pass_probability) || 0,
+      riskLevel: String(s.risk_level || '').toUpperCase(),
+      weakTopics: (s.weak_topics || []).filter(t => 
+        t && 
+        t.toLowerCase() !== 'name' && 
+        t.toLowerCase() !== 'null' && 
+        t.toLowerCase() !== 'undefined'
+      ),
+      attendance: Number(s.attendance) || 0,
+      internalMarks: Number(s.internal_marks) || 0,
+      assignmentMarks: Number(s.assignment_marks) || 0,
+      gpa: Number(s.previous_gpa) || 0,
+      rawData: s
+    }));
+  }, [students, filterRisk]);
+
+  // Generate AI study plan based on student data
+  const generateStudyPlan = (student) => {
+    const plans = [];
+    
+    // Attendance-based intervention
+    if (student.attendance < 75) {
+      plans.push({
+        type: 'attendance',
+        priority: 'high',
+        title: 'Improve Attendance',
+        description: `Current attendance: ${student.attendance.toFixed(1)}%. Target: 85%+`,
+        actions: [
+          'Schedule regular check-ins with student',
+          'Identify barriers to attendance',
+          'Provide flexible learning options if needed'
+        ]
+      });
+    }
+
+    // Assignment-based intervention
+    if (student.assignmentMarks < 60) {
+      plans.push({
+        type: 'assignments',
+        priority: 'high',
+        title: 'Assignment Support',
+        description: `Current score: ${student.assignmentMarks.toFixed(1)}%. Needs improvement`,
+        actions: [
+          'Provide assignment templates and examples',
+          'Offer one-on-one tutoring sessions',
+          'Break down complex assignments into smaller tasks'
+        ]
+      });
+    }
+
+    // Internal marks intervention
+    if (student.internalMarks < 50) {
+      plans.push({
+        type: 'internal',
+        priority: 'high',
+        title: 'Internal Assessment Improvement',
+        description: `Current score: ${student.internalMarks.toFixed(1)}%. Requires immediate attention`,
+        actions: [
+          'Review past test papers with student',
+          'Identify knowledge gaps',
+          'Create personalized practice tests'
+        ]
+      });
+    }
+
+    // Weak topics intervention
+    if (student.weakTopics.length > 0) {
+      plans.push({
+        type: 'topics',
+        priority: student.weakTopics.length > 3 ? 'high' : 'medium',
+        title: 'Subject-Specific Support',
+        description: `Struggling with ${student.weakTopics.length} topic(s)`,
+        actions: [
+          `Focus on: ${student.weakTopics.slice(0, 3).join(', ')}`,
+          'Provide additional study materials',
+          'Arrange peer tutoring or study groups',
+          'Schedule weekly progress reviews'
+        ]
+      });
+    }
+
+    // GPA-based intervention
+    if (student.gpa < 2.5) {
+      plans.push({
+        type: 'gpa',
+        priority: 'medium',
+        title: 'Overall Academic Performance',
+        description: `Current GPA: ${student.gpa.toFixed(2)}. Needs consistent improvement`,
+        actions: [
+          'Develop time management skills',
+          'Create structured study schedule',
+          'Monitor progress across all subjects'
+        ]
+      });
+    }
+
+    // If no specific issues, provide general support
+    if (plans.length === 0) {
+      plans.push({
+        type: 'general',
+        priority: 'medium',
+        title: 'Preventive Support',
+        description: 'Maintain current performance and prevent decline',
+        actions: [
+          'Regular progress monitoring',
+          'Encourage consistent study habits',
+          'Provide motivational support'
+        ]
+      });
+    }
+
+    return plans;
+  };
+
+  const handleGenerateQuiz = (topics) => {
+    addToast(`Quiz generation for: ${topics.slice(0, 2).join(', ')}...`, 'info');
+  };
+
+  const handleStartRevision = (topics) => {
+    if (topics.length === 0) {
+      addToast('No topics available for revision', 'error');
+      return;
+    }
+    
+    // Create a revision plan message
+    const topicList = topics.slice(0, 5).join(', ');
+    const message = `Create a detailed revision plan for these topics: ${topicList}`;
+    
+    // Navigate to AI Advisor with the revision query
+    navigate('/advisor', { state: { query: message } });
+  };
+
+  const handleViewDetails = (studentId) => {
+    navigate(`/student/${studentId}`);
+  };
+
+  if (loading) {
+    return (
+      <div className="interventions-page">
+        <div className="interventions-loading">
+          <div className="skeleton" style={{ height: 200, marginBottom: 20 }} />
+          <div className="skeleton" style={{ height: 400 }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="interventions-page">
+        <div className="interventions-error">
+          <span className="interventions-error-icon">⚠</span>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="interventions-page">
+      <header className="interventions-header">
+        <div>
+          <h1 className="interventions-title">🎯 Academic Interventions</h1>
+          <p className="interventions-subtitle">Personalized support plans for students needing help</p>
+        </div>
+        <div className="interventions-stats">
+          <div className="interventions-stat">
+            <span className="interventions-stat-value">{studentsNeedingHelp.length}</span>
+            <span className="interventions-stat-label">Students Need Help</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Filter Controls */}
+      <div className="interventions-filters">
+        <button
+          className={`interventions-filter-btn ${filterRisk === 'ALL' ? 'active' : ''}`}
+          onClick={() => setFilterRisk('ALL')}
+        >
+          All ({students.filter(s => {
+            const risk = String(s.risk_level || '').toUpperCase();
+            return risk === 'HIGH' || risk === 'MEDIUM';
+          }).length})
+        </button>
+        <button
+          className={`interventions-filter-btn ${filterRisk === 'HIGH' ? 'active' : ''}`}
+          onClick={() => setFilterRisk('HIGH')}
+        >
+          High Risk ({students.filter(s => String(s.risk_level || '').toUpperCase() === 'HIGH').length})
+        </button>
+        <button
+          className={`interventions-filter-btn ${filterRisk === 'MEDIUM' ? 'active' : ''}`}
+          onClick={() => setFilterRisk('MEDIUM')}
+        >
+          Medium Risk ({students.filter(s => String(s.risk_level || '').toUpperCase() === 'MEDIUM').length})
+        </button>
+      </div>
+
+      {studentsNeedingHelp.length === 0 ? (
+        <div className="interventions-empty">
+          <span className="interventions-empty-icon">✅</span>
+          <h2>No Students Need Intervention</h2>
+          <p>All students are performing well. Great job!</p>
+        </div>
+      ) : (
+        <div className="interventions-grid">
+          {studentsNeedingHelp.map((student) => {
+            const studyPlans = generateStudyPlan(student);
+            const isSelected = selectedStudent?.id === student.id;
+
+            return (
+              <div key={student.id} className="intervention-card">
+                <div className="intervention-card-header">
+                  <div className="intervention-student-info">
+                    <h3 className="intervention-student-id">Student {student.id}</h3>
+                    <span className={`intervention-risk-badge intervention-risk-${student.riskLevel.toLowerCase()}`}>
+                      {student.riskLevel} RISK
+                    </span>
+                  </div>
+                  <div className="intervention-pass-prob">
+                    <span className="intervention-pass-label">Pass Probability</span>
+                    <span className="intervention-pass-value">{(student.passProb * 100).toFixed(1)}%</span>
+                  </div>
+                </div>
+
+                {/* Weak Subjects Section */}
+                {student.weakTopics.length > 0 && (
+                  <div className="intervention-section">
+                    <h4 className="intervention-section-title">📚 Weak Subjects</h4>
+                    <div className="intervention-topics">
+                      {student.weakTopics.slice(0, 5).map((topic, idx) => (
+                        <span key={idx} className="intervention-topic-tag">{topic}</span>
+                      ))}
+                      {student.weakTopics.length > 5 && (
+                        <span className="intervention-topic-tag intervention-topic-more">
+                          +{student.weakTopics.length - 5} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* AI Study Plan Section */}
+                <div className="intervention-section">
+                  <h4 className="intervention-section-title">🤖 AI-Generated Study Plan</h4>
+                  <div className="intervention-plans">
+                    {studyPlans.slice(0, isSelected ? studyPlans.length : 2).map((plan, idx) => (
+                      <div key={idx} className={`intervention-plan intervention-plan-${plan.priority}`}>
+                        <div className="intervention-plan-header">
+                          <span className="intervention-plan-title">{plan.title}</span>
+                          <span className={`intervention-plan-priority intervention-priority-${plan.priority}`}>
+                            {plan.priority}
+                          </span>
+                        </div>
+                        <p className="intervention-plan-desc">{plan.description}</p>
+                        {isSelected && (
+                          <ul className="intervention-plan-actions">
+                            {plan.actions.map((action, aidx) => (
+                              <li key={aidx}>{action}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {!isSelected && studyPlans.length > 2 && (
+                    <button
+                      className="intervention-expand-btn"
+                      onClick={() => setSelectedStudent(student)}
+                    >
+                      View {studyPlans.length - 2} More Plan(s)
+                    </button>
+                  )}
+                  {isSelected && (
+                    <button
+                      className="intervention-expand-btn"
+                      onClick={() => setSelectedStudent(null)}
+                    >
+                      Show Less
+                    </button>
+                  )}
+                </div>
+
+                {/* Action Buttons Section */}
+                <div className="intervention-section">
+                  <h4 className="intervention-section-title">🎯 Quick Actions</h4>
+                  <div className="intervention-actions">
+                    <button
+                      className="intervention-action-btn intervention-action-quiz"
+                      onClick={() => handleGenerateQuiz(student.weakTopics)}
+                      disabled={student.weakTopics.length === 0}
+                    >
+                       Generate Quiz
+                    </button>
+                    <button
+                      className="intervention-action-btn intervention-action-revision"
+                      onClick={() => handleStartRevision(student.weakTopics)}
+                      disabled={student.weakTopics.length === 0}
+                    >
+                       Start Revision
+                    </button>
+                    <button
+                      className="intervention-action-btn intervention-action-details"
+                      onClick={() => handleViewDetails(student.id)}
+                    >
+                       View Details
+                    </button>
+                  </div>
+                </div>
+
+                {/* Optimized Study Plan Section (Dynamic Programming) */}
+                {student.weakTopics.length > 0 && (
+                  <div className="intervention-section">
+                    <div className="intervention-dp-header">
+                      <h4 className="intervention-section-title">⚡ Optimized Study Plan (DP Algorithm)</h4>
+                      <button
+                        className="intervention-dp-toggle"
+                        onClick={() => setShowOptimizedPlan(showOptimizedPlan === student.id ? null : student.id)}
+                      >
+                        {showOptimizedPlan === student.id ? '▼ Hide' : '▶ Generate'}
+                      </button>
+                    </div>
+                    
+                    {showOptimizedPlan === student.id && (
+                      <div className="intervention-dp-plan">
+                        {(() => {
+                          const optimizedPlan = generateOptimizedStudyPlan(
+                            student,
+                            student.weakTopics,
+                            studyHours
+                          );
+                          const metrics = calculateStudyPlanMetrics(optimizedPlan);
+                          
+                          return (
+                            <>
+                              {/* Study Hours Input */}
+                              <div className="intervention-dp-input">
+                                <label className="intervention-dp-label">
+                                  Available Study Hours/Week:
+                                  <input
+                                    type="number"
+                                    min="5"
+                                    max="40"
+                                    value={studyHours}
+                                    onChange={(e) => setStudyHours(Number(e.target.value))}
+                                    className="intervention-dp-hours-input"
+                                  />
+                                </label>
+                              </div>
+
+                              {/* Plan Metrics */}
+                              <div className="intervention-dp-metrics">
+                                <div className="intervention-dp-metric">
+                                  <span className="intervention-dp-metric-label">Coverage</span>
+                                  <span className="intervention-dp-metric-value">{metrics.coverage}%</span>
+                                </div>
+                                <div className="intervention-dp-metric">
+                                  <span className="intervention-dp-metric-label">Efficiency</span>
+                                  <span className="intervention-dp-metric-value">{optimizedPlan.efficiency}%</span>
+                                </div>
+                                <div className="intervention-dp-metric">
+                                  <span className="intervention-dp-metric-label">Total Hours</span>
+                                  <span className="intervention-dp-metric-value">{optimizedPlan.totalHours}h</span>
+                                </div>
+                                <div className="intervention-dp-metric">
+                                  <span className="intervention-dp-metric-label">Impact Score</span>
+                                  <span className="intervention-dp-metric-value">{optimizedPlan.totalImpact}</span>
+                                </div>
+                              </div>
+
+                              {/* Prioritized Subjects */}
+                              {optimizedPlan.subjects.length > 0 && (
+                                <div className="intervention-dp-subjects">
+                                  <h5 className="intervention-dp-subtitle">📊 Prioritized Study Schedule</h5>
+                                  <div className="intervention-dp-subject-list">
+                                    {optimizedPlan.subjects.map((subject, idx) => (
+                                      <div key={idx} className="intervention-dp-subject">
+                                        <div className="intervention-dp-subject-header">
+                                          <span className="intervention-dp-subject-rank">#{subject.priority}</span>
+                                          <span className="intervention-dp-subject-name">{subject.name}</span>
+                                          <span className="intervention-dp-subject-hours">{subject.hours}h/week</span>
+                                        </div>
+                                        <div className="intervention-dp-subject-details">
+                                          <div className="intervention-dp-detail">
+                                            <span className="intervention-dp-detail-label">Difficulty:</span>
+                                            <div className="intervention-dp-progress-bar">
+                                              <div
+                                                className="intervention-dp-progress-fill intervention-dp-difficulty"
+                                                style={{ width: `${subject.difficulty}%` }}
+                                              />
+                                            </div>
+                                            <span className="intervention-dp-detail-value">{subject.difficulty}/100</span>
+                                          </div>
+                                          <div className="intervention-dp-detail">
+                                            <span className="intervention-dp-detail-label">Impact:</span>
+                                            <div className="intervention-dp-progress-bar">
+                                              <div
+                                                className="intervention-dp-progress-fill intervention-dp-impact"
+                                                style={{ width: `${subject.impact}%` }}
+                                              />
+                                            </div>
+                                            <span className="intervention-dp-detail-value">{subject.impact}/100</span>
+                                          </div>
+                                          <div className="intervention-dp-goal">
+                                            <span className="intervention-dp-goal-icon">🎯</span>
+                                            <span className="intervention-dp-goal-text">{subject.dailyGoal}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Weekly Schedule */}
+                              {optimizedPlan.weeklySchedule && (
+                                <div className="intervention-dp-schedule">
+                                  <h5 className="intervention-dp-subtitle">📅 Weekly Schedule</h5>
+                                  <div className="intervention-dp-week">
+                                    {Object.entries(optimizedPlan.weeklySchedule).map(([day, sessions]) => (
+                                      <div key={day} className="intervention-dp-day">
+                                        <div className="intervention-dp-day-name">{day.slice(0, 3)}</div>
+                                        <div className="intervention-dp-sessions">
+                                          {sessions.length > 0 ? (
+                                            sessions.map((session, idx) => (
+                                              <div key={idx} className="intervention-dp-session" title={session.subject}>
+                                                <span className="intervention-dp-session-hours">{session.hours}h</span>
+                                              </div>
+                                            ))
+                                          ) : (
+                                            <div className="intervention-dp-session-empty">-</div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Recommendations */}
+                              {optimizedPlan.recommendations && optimizedPlan.recommendations.length > 0 && (
+                                <div className="intervention-dp-recommendations">
+                                  <h5 className="intervention-dp-subtitle">💡 AI Recommendations</h5>
+                                  <ul className="intervention-dp-rec-list">
+                                    {optimizedPlan.recommendations.map((rec, idx) => (
+                                      <li key={idx} className="intervention-dp-rec-item">{rec}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Revision Topics Section */}
+                {student.weakTopics.length > 0 && (
+                  <div className="intervention-section">
+                    <h4 className="intervention-section-title">📋 Recommended Revision Topics</h4>
+                    <div className="intervention-revision-list">
+                      {student.weakTopics.slice(0, 5).map((topic, idx) => (
+                        <div key={idx} className="intervention-revision-item">
+                          <span className="intervention-revision-number">{idx + 1}</span>
+                          <span className="intervention-revision-topic">{topic}</span>
+                          <span className="intervention-revision-priority">Priority</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

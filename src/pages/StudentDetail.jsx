@@ -6,6 +6,7 @@ import RiskBadge from '../components/RiskBadge';
 import RadarChart from '../components/RadarChart';
 import AnalysisCard from '../components/AnalysisCard';
 import QuizDisplay from '../components/QuizDisplay';
+import { generateOptimizedStudyPlan, calculateStudyPlanMetrics } from '../utils/studyPlanOptimizer';
 import './StudentDetail.css';
 
 export default function StudentDetail() {
@@ -20,6 +21,8 @@ export default function StudentDetail() {
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [loadingQuiz, setLoadingQuiz] = useState(false);
   const [uploadingCSV, setUploadingCSV] = useState(false);
+  const [showDPPlan, setShowDPPlan] = useState(false);
+  const [studyHours, setStudyHours] = useState(20);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -56,10 +59,23 @@ export default function StudentDetail() {
     setAnalysis(null);
     askAdvisor(`Why is student ${sid} at risk?`)
       .then((res) => {
-        setAnalysis(res.data || res);
+        console.log('Analysis response:', res);
+        // Handle different response formats
+        if (res.ai_analysis) {
+          setAnalysis(res.ai_analysis);
+        } else if (res.data && res.data.ai_analysis) {
+          setAnalysis(res.data.ai_analysis);
+        } else if (res.data) {
+          setAnalysis(res.data);
+        } else if (res.message) {
+          setAnalysis({ summary: res.message });
+        } else {
+          setAnalysis(res);
+        }
       })
-      .catch(() => {
-        setAnalysis({ summary: 'Unable to fetch analysis.' });
+      .catch((err) => {
+        console.error('Analysis error:', err);
+        setAnalysis({ summary: 'Unable to fetch analysis. Please try again.' });
       })
       .finally(() => setLoadingAnalysis(false));
   };
@@ -196,16 +212,24 @@ export default function StudentDetail() {
               </span>
             </div>
           </div>
-          {(student.weak_topics || []).length > 0 && (
-            <div className="student-weak-topics">
-              <span className="student-info-label">Weak topics</span>
-              <div className="student-weak-chips">
-                {student.weak_topics.map((t) => (
-                  <span key={t} className="weak-topic-chip">{t}</span>
-                ))}
-              </div>
+          <div className="student-weak-topics">
+            <span className="student-info-label">Weak topics</span>
+            <div className="student-weak-chips">
+              {(student.weak_topics && student.weak_topics.length > 0) ? (
+                student.weak_topics
+                  .filter(t => t && t.toLowerCase() !== 'name' && t.toLowerCase() !== 'null' && t.toLowerCase() !== 'undefined')
+                  .map((t, idx) => (
+                    <span key={idx} className="weak-topic-chip">{t}</span>
+                  ))
+              ) : (
+                <span className="weak-topic-none">No weak topics identified</span>
+              )}
+              {student.weak_topics && student.weak_topics.length > 0 && 
+               student.weak_topics.filter(t => t && t.toLowerCase() !== 'name' && t.toLowerCase() !== 'null' && t.toLowerCase() !== 'undefined').length === 0 && (
+                <span className="weak-topic-none">No weak topics identified</span>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         <div className="student-radar-card">
@@ -262,6 +286,116 @@ export default function StudentDetail() {
         <div className="student-quiz-section">
           <h2 className="student-section-title">Generated quiz</h2>
           <QuizDisplay data={quiz} />
+        </div>
+      )}
+
+      {/* DP Optimized Study Plan */}
+      {student && student.weak_topics && student.weak_topics.filter(t => t && t.toLowerCase() !== 'name').length > 0 && (
+        <div className="student-dp-section">
+          <div className="student-dp-header">
+            <h2 className="student-section-title">⚡ Optimized Study Plan (DP Algorithm)</h2>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowDPPlan(!showDPPlan)}
+            >
+              {showDPPlan ? 'Hide Plan' : 'Generate Plan'}
+            </button>
+          </div>
+
+          {showDPPlan && (() => {
+            const weakTopics = student.weak_topics.filter(t => t && t.toLowerCase() !== 'name');
+            const studentData = {
+              id: student.student_id,
+              weakTopics: weakTopics,
+              attendance: Number(student.attendance) || 0,
+              internalMarks: Number(student.internal_marks) || 0,
+              assignmentMarks: Number(student.assignment_marks) || 0,
+              gpa: Number(student.previous_gpa) || 0,
+            };
+            
+            const optimizedPlan = generateOptimizedStudyPlan(studentData, weakTopics, studyHours);
+            const metrics = calculateStudyPlanMetrics(optimizedPlan);
+
+            return (
+              <div className="student-dp-content">
+                <div className="student-dp-controls">
+                  <label className="student-dp-label">
+                    Available Study Hours/Week:
+                    <input
+                      type="number"
+                      min="5"
+                      max="40"
+                      value={studyHours}
+                      onChange={(e) => setStudyHours(Number(e.target.value))}
+                      className="student-dp-input"
+                    />
+                  </label>
+                </div>
+
+                <div className="student-dp-metrics">
+                  <div className="student-dp-metric">
+                    <span className="metric-label">Coverage</span>
+                    <span className="metric-value">{metrics.coverage}%</span>
+                  </div>
+                  <div className="student-dp-metric">
+                    <span className="metric-label">Efficiency</span>
+                    <span className="metric-value">{optimizedPlan.efficiency}%</span>
+                  </div>
+                  <div className="student-dp-metric">
+                    <span className="metric-label">Total Hours</span>
+                    <span className="metric-value">{optimizedPlan.totalHours}h</span>
+                  </div>
+                  <div className="student-dp-metric">
+                    <span className="metric-label">Impact Score</span>
+                    <span className="metric-value">{optimizedPlan.totalImpact}</span>
+                  </div>
+                </div>
+
+                {optimizedPlan.subjects && optimizedPlan.subjects.length > 0 && (
+                  <div className="student-dp-subjects">
+                    <h3 className="student-dp-subtitle">📊 Prioritized Study Schedule</h3>
+                    {optimizedPlan.subjects.map((subject, idx) => (
+                      <div key={idx} className="student-dp-subject">
+                        <div className="subject-header">
+                          <span className="subject-rank">#{subject.priority}</span>
+                          <span className="subject-name">{subject.name}</span>
+                          <span className="subject-hours">{subject.hours}h/week</span>
+                        </div>
+                        <div className="subject-details">
+                          <div className="subject-detail">
+                            <span>Difficulty: {subject.difficulty}/100</span>
+                            <div className="progress-bar">
+                              <div className="progress-fill difficulty" style={{ width: `${subject.difficulty}%` }} />
+                            </div>
+                          </div>
+                          <div className="subject-detail">
+                            <span>Impact: {subject.impact}/100</span>
+                            <div className="progress-bar">
+                              <div className="progress-fill impact" style={{ width: `${subject.impact}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="subject-goal">
+                          <span>🎯 {subject.dailyGoal}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {optimizedPlan.recommendations && optimizedPlan.recommendations.length > 0 && (
+                  <div className="student-dp-recommendations">
+                    <h3 className="student-dp-subtitle">💡 AI Recommendations</h3>
+                    <ul>
+                      {optimizedPlan.recommendations.map((rec, idx) => (
+                        <li key={idx}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

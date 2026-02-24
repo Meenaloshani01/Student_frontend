@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   PieChart,
   Pie,
@@ -12,10 +12,9 @@ import {
   Legend,
   Tooltip,
 } from 'recharts';
-import { getStudents, uploadCSV } from '../services/api';
+import { getStudents } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 import SummaryCards from '../components/SummaryCards';
-import StudentTable from '../components/StudentTable';
 import './Dashboard.css';
 
 const RISK_COLORS = {
@@ -83,25 +82,6 @@ function formatLastUpdated(date) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function buildCSV(students) {
-  const headers = ['student_id', 'attendance', 'internal_marks', 'assignment_marks', 'previous_gpa', 'pass_probability', 'risk_level', 'weak_topics'];
-  const escape = (v) => (v == null ? '' : `"${String(v).replace(/"/g, '""')}"`);
-  const rows = students.map((s) =>
-    headers.map((h) => (h === 'weak_topics' ? escape((s.weak_topics || []).join(', ')) : escape(s[h]))).join(',')
-  );
-  return [headers.join(','), ...rows].join('\r\n');
-}
-
-function downloadCSV(students) {
-  const blob = new Blob([buildCSV(students)], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `students-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 export default function Dashboard() {
   const { addToast } = useToast();
   const [students, setStudents] = useState([]);
@@ -110,10 +90,6 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [riskFilter, setRiskFilter] = useState('all');
-  const [topicFilter, setTopicFilter] = useState('');
-  const [uploadingCSV, setUploadingCSV] = useState(false);
-  const fileInputRef = useRef(null);
 
   const fetchData = useCallback(() => {
     const isRefresh = students.length > 0;
@@ -189,79 +165,7 @@ export default function Dashboard() {
 
   const insights = useMemo(() => computeInsights(students), [students]);
 
-  const uniqueTopics = useMemo(() => {
-    const set = new Set();
-    students.forEach((s) => (s.weak_topics || []).forEach((t) => set.add(t)));
-    return Array.from(set).sort();
-  }, [students]);
-
-  const filteredStudents = useMemo(() => {
-    let list = students;
-    if (riskFilter !== 'all') {
-      list = list.filter((s) => String(s.risk_level || '').toUpperCase() === riskFilter);
-    }
-    if (topicFilter) {
-      const t = topicFilter.toLowerCase();
-      list = list.filter((s) => (s.weak_topics || []).some((topic) => String(topic).toLowerCase().includes(t)));
-    }
-    return list;
-  }, [students, riskFilter, topicFilter]);
-
   const hasData = students.length > 0;
-
-  const handleExportCSV = () => {
-    downloadCSV(filteredStudents);
-    addToast('CSV downloaded', 'success');
-  };
-
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (event) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      performUpload(file);
-    }
-  };
-
-  const performUpload = async (file) => {
-    setUploadingCSV(true);
-    try {
-      console.log('Uploading file:', file.name);
-      const response = await uploadCSV(file);
-      console.log('Upload response:', response);
-      addToast(response.message || 'CSV uploaded successfully', 'success');
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      // Wait a bit for backend to process, then refresh
-      setTimeout(() => {
-        console.log('Refreshing data after upload...');
-        fetchData();
-      }, 500);
-    } catch (error) {
-      console.error('Upload error:', error);
-      let errorMessage = 'Failed to upload CSV';
-      
-      if (error.code === 'ECONNABORTED') {
-        errorMessage = 'Upload timed out. Please try again.';
-      } else if (error.response) {
-        errorMessage = error.response.data?.detail 
-          || error.response.data?.message 
-          || `Server error: ${error.response.status}`;
-      } else if (error.request) {
-        errorMessage = 'Network error. Please check your connection.';
-      }
-      
-      addToast(errorMessage, 'error');
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    } finally {
-      setUploadingCSV(false);
-    }
-  };
 
   return (
     <div className="dashboard">
@@ -287,16 +191,6 @@ export default function Dashboard() {
               <span className="dashboard-refresh-icon">{refreshing ? '⟳' : '↻'}</span>
               {refreshing ? 'Refreshing…' : 'Refresh'}
             </button>
-            {hasData && (
-              <button
-                type="button"
-                className="dashboard-export"
-                onClick={handleExportCSV}
-                aria-label="Export CSV"
-              >
-                Export CSV
-              </button>
-            )}
           </div>
         </div>
       </header>
@@ -428,53 +322,6 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-
-      <section className="dashboard-table-section dashboard-anim dashboard-anim--5">
-        <div className="dashboard-table-header">
-          <h2 className="dashboard-section-title">All students</h2>
-          <div className="dashboard-filters">
-            <button
-              type="button"
-              className="dashboard-upload-btn"
-              onClick={handleUploadClick}
-              disabled={uploadingCSV}
-              aria-label="Upload CSV file for student data"
-            >
-              {uploadingCSV ? 'Uploading…' : 'Upload CSV'}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              onChange={handleFileChange}
-              style={{ display: 'none' }}
-            />
-            <select
-              className="dashboard-filter-select"
-              value={riskFilter}
-              onChange={(e) => setRiskFilter(e.target.value)}
-              aria-label="Filter by risk"
-            >
-              <option value="all">All risk levels</option>
-              <option value="HIGH">High risk</option>
-              <option value="MEDIUM">Medium risk</option>
-              <option value="LOW">Low risk</option>
-            </select>
-            <select
-              className="dashboard-filter-select"
-              value={topicFilter}
-              onChange={(e) => setTopicFilter(e.target.value)}
-              aria-label="Filter by weak topic"
-            >
-              <option value="">All topics</option>
-              {uniqueTopics.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <StudentTable students={filteredStudents} loading={loading} />
-      </section>
     </div>
   );
 }
